@@ -36,5 +36,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "yard", "~> 0.9.7"
   spec.add_runtime_dependency "aws-sdk-s3", "~> 1"
   spec.add_runtime_dependency "gpgme", "~> 2.0.5"
-  spec.add_runtime_dependency "rubyzip", "~>1.1.6"
+  spec.add_runtime_dependency "rubyzip", "~>1.2.1"
 end

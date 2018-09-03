@@ -55,6 +55,7 @@ module Artifact
         gpg_id: '01234567890ABCDEF00000000000000000000000',
         signer: '01234567890ABCDEF00000000000000000000000',
         output_prefix: "[#{@script_name}]",
+        environment_name: 'staging',
         target_environment_name: 'production'
       }
       @pm = PluginManager.instance
@@ -156,7 +157,7 @@ examples:
     # get artifact staging/tools/mailconsumer@1.0.1
     #{@script_name} --get --artifact tools/mailconsumer -v 1.0.1
 
-    # promote artifact fromt staging/tools/mailconsumer@1.0.1 to production/tools/mailconsumer@1.0.1
+    # promote artifact from staging/tools/mailconsumer@1.0.1 to production/tools/mailconsumer@1.0.1
     #{@script_name} -P -e staging -a tools/mailconsumer -v 1.0.1
 
     # push artifact to staging/tools/mailconsumer@1.0.1
