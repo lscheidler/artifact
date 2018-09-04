@@ -1,4 +1,4 @@
-0.1.1 (UNRELEASED)
+0.1.1 (2018-09-04)
 ==================
 
 - fix problem with tests
