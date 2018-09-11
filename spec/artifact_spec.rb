@@ -239,10 +239,7 @@ describe Artifact do
       it 'should run without an error' do
         @push = TestPush.new @config
         @push.find_artifact
-        data = @push.archive_artifact
-        File.open('/tmp/test.zip', 'w') do |io|
-          io.print data.read
-        end
+        @push.archive_artifact
         @push.encrypt_artifact
       end
     end
