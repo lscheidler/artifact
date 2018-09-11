@@ -61,8 +61,12 @@ module Artifact
             out.write File.read(file)
           else
             @artifacts.each do |artifact|
+              next if artifact == './'
+
               out.put_next_entry(artifact)
-              out.write File.read(artifact)
+              if not File.directory? artifact
+                out.write File.read(artifact)
+              end
             end
           end
         end

@@ -113,7 +113,7 @@ describe Artifact do
         @config[:file_name_pattern] = '.*'
       end
 
-      after(:all) do
+      after() do
         Dir.chdir @pwd
       end
 
@@ -124,6 +124,13 @@ describe Artifact do
 
         expect(@push.artifacts.length).to be(3)
         expect(@push.artifacts).to eq(['./', './README', './test.txt'])
+      end
+
+      it 'should run without an error' do
+        @push = TestPush.new @config
+        @push.find_artifact
+        @push.archive_artifact
+        @push.encrypt_artifact
       end
     end
 
@@ -207,6 +214,36 @@ describe Artifact do
 
           expect(stub_resource.client.get_object(bucket: @bucket_name, key: '').body.read).to eq('')
         end
+      end
+    end
+
+    context 'finds multiple files with subdirectories' do
+      before(:all) do
+        @config[:file_name_pattern] = '.*'
+        @config[:target_directory] = 'target_with_subdirectories'
+      end
+
+      after() do
+        Dir.chdir @pwd
+      end
+
+      it 'should find all files in spec/data/target' do
+        expect(Aws::S3::Resource).to receive(:new).and_return(stub_resource)
+        @push = TestPush.new @config
+        @push.find_artifact
+
+        expect(@push.artifacts.length).to be(6)
+        expect(@push.artifacts).to eq(['./', './css', './css/app.css', './index.html', './js', './js/app.js'])
+      end
+
+      it 'should run without an error' do
+        @push = TestPush.new @config
+        @push.find_artifact
+        data = @push.archive_artifact
+        File.open('/tmp/test.zip', 'w') do |io|
+          io.print data.read
+        end
+        @push.encrypt_artifact
       end
     end
   end
