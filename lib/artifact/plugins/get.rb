@@ -14,6 +14,7 @@
 
 require 'fileutils'
 require 'gpgme'
+require 'gpgme/version'
 require 'tempfile'
 require 'zip'
 
@@ -70,16 +71,16 @@ module Artifact
 
       # decrypt artifact with gpg
       def decrypt_artifact
-        if GPGME::Engine.info.first.version.start_with? '2.0'
-          decrypt_artifact_v20
+        if GPGME::VERSION == '1.0.8'
+          decrypt_artifact_compat
         else
-          decrypt_artifact_v21
+          decrypt_artifact_new
         end
       end
 
-      # decrypt artifact with gpg version == 2.0
+      # decrypt artifact, when ruby gpgme version == 1.0.8 (aka 2.0.5) is installed
       # uses gpg commandline program directly
-      def decrypt_artifact_v20
+      def decrypt_artifact_compat
         require 'tempfile'
 
         tempfile = Tempfile.new(["#{ @artifact.gsub('/', '_') }-#{ @version }_", '.gpg'])
@@ -93,6 +94,9 @@ module Artifact
           File.open(signfile.path, 'w') do |io|
             io.print @sign_data
           end
+          p @data.class
+          FileUtils.cp tempfile.path, '/var/tmp/tempfiles/test.gpg'
+          FileUtils.cp signfile.path, '/var/tmp/tempfiles/test.gpg.sig'
           %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --verify #{signfile.path} #{ tempfile.path }}
           raise 'Verification failed' if not $?.success?
         end
@@ -105,8 +109,8 @@ module Artifact
         @data = File.open(tempfile.path.gsub(/\.gpg$/, ''))
       end
 
-      # decrypt artifact with gpg version != 2.0
-      def decrypt_artifact_v21
+      # decrypt artifact with ruby gpgme version > 1.0.8
+      def decrypt_artifact_new
         crypto = GPGME::Crypto.new pinentry_mode: GPGME::PINENTRY_MODE_LOOPBACK, password: @gpg_passphrase
 
         if @verify
