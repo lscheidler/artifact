@@ -93,7 +93,7 @@ module Artifact
           File.open(signfile.path, 'w') do |io|
             io.print @sign_data
           end
-          %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --verify #{sign_data.path} #{ tempfile.path }}
+          %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --verify #{signfile.path} #{ tempfile.path }}
           raise 'Verification failed' if not $?.success?
         end
 
