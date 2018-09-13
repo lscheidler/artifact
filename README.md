@@ -23,7 +23,13 @@ bin/artifact -h
 
 ```
 # push artifact to staging/tools/mailconsumer@1.0.1
-artifact -p -e staging -a tools/mailconsumer -v 1.0.1 -t releases -w ~/tmp/data/tools/mailconsumer -F '.*mailconsumer.*.jar'
+artifact -p -e staging -a tools/mailconsumer -v 1.0.1 -t releases -w ~/workspace/mailconsumer -F '.*mailconsumer.*.jar'
+```
+
+```
+# push artifact to staging/website@2.0.1
+# + exclude .git directory
+artifact -p -e staging -a website -v 2.0.1 -t . -w ~/workspace/website -F '.*' --exclude '.git' --exclude '\.\/logs'
 ```
 
 ### get artifact

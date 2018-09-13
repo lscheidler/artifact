@@ -70,6 +70,43 @@ module Artifact
 
       # decrypt artifact with gpg
       def decrypt_artifact
+        if GPGME::Engine.info.first.version.start_with? '2.0'
+          decrypt_artifact_v20
+        else
+          decrypt_artifact_v21
+        end
+      end
+
+      # decrypt artifact with gpg version == 2.0
+      # uses gpg commandline program directly
+      def decrypt_artifact_v20
+        require 'tempfile'
+
+        tempfile = Tempfile.new(["#{ @artifact.gsub('/', '_') }-#{ @version }_", '.gpg'])
+        File.open(tempfile.path, 'w') do |io|
+          io.print @data
+        end
+
+        if @verify
+          subsection 'Verify artifact', color: :green, prefix: @output_prefix unless @silent
+          signfile = Tempfile.new(["#{ @artifact.gsub('/', '_') }-#{ @version }_", '.gpg.sig'])
+          File.open(signfile.path, 'w') do |io|
+            io.print @sign_data
+          end
+          %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --verify #{sign_data.path} #{ tempfile.path }}
+          raise 'Verification failed' if not $?.success?
+        end
+
+        subsection 'Decrypt artifact', color: :green, prefix: @output_prefix unless @silent
+
+        %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --decrypt-files #{ tempfile.path }}
+        raise 'Decryption failed' if not $?.success?
+
+        @data = File.open(tempfile.path.gsub(/\.gpg$/, ''))
+      end
+
+      # decrypt artifact with gpg version != 2.0
+      def decrypt_artifact_v21
         crypto = GPGME::Crypto.new pinentry_mode: GPGME::PINENTRY_MODE_LOOPBACK, password: @gpg_passphrase
 
         if @verify
@@ -94,6 +131,7 @@ module Artifact
           # Handle entries one by one
           zip_file.each do |entry|
             # Extract to file/directory/symlink
+            v '+ ' + "#{@release_directory}/#{entry.name}"
             entry.extract("#{@release_directory}/#{entry.name}") do
               @force
             end

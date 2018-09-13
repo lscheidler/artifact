@@ -100,6 +100,10 @@ module Artifact
           @config[:stacktrace] = true
         end
 
+        opts.on('--verbose', 'verbose output') do
+          @config[:verbose] = true
+        end
+
         opts.separator "\ncommon options:"
         opts.on('-a', '--artifact STRING', 'set artifact name') do |artifact|
           @config[:artifact] = artifact
@@ -131,6 +135,11 @@ module Artifact
 
         ## PUSH
         opts.separator "\npush options:"
+        opts.on('--exclude PATTERN', 'set pattern to exclude files from artifact') do |pattern|
+          @config[:exclude] ||= []
+          @config[:exclude] << pattern
+        end
+
         opts.on('-F', '--file-name-pattern PATTERN', 'set file name pattern') do |pattern|
           @config[:file_name_pattern] = pattern
         end

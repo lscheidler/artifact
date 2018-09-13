@@ -28,7 +28,8 @@ def initialize_test_data
   @bucket_name = 'my-bucket'
   @bucket_region = 'eu-central-1'
 
-  @config = OverlayConfig::Config.new config_scope: 'artifact', defaults: {
+  @config = OverlayConfig::Config.new config_scope: 'artifact'
+  @test_config = {
     bucket_name: @bucket_name,
     bucket_region: @bucket_region,
     gpg_id: '6986687D4705039AB6D27D6D39BC682A5434DA00',
@@ -49,6 +50,8 @@ def initialize_test_data
     # Get
     destination_directory: get_temporary_directory('release')
   }
+
+  @config.insert(0, 'test', @test_config)
 
   @pwd = Dir.pwd
   @test_file_stat = File.stat('spec/data/target/test.txt')
@@ -92,5 +95,5 @@ end
 
 def cleanup
   FileUtils.rm_rf @gpg_home_dir
-  FileUtils.rm_rf @config[:destination_directory]
+  FileUtils.rm_rf @test_config[:destination_directory]
 end

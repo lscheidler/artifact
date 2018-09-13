@@ -46,8 +46,8 @@ describe Artifact do
 
     context 'finds one file' do
       before(:all) do
-        @config[:file_name_pattern] = '.*\.txt'
-        @config[:sign] = true
+        @test_config[:file_name_pattern] = '.*\.txt'
+        @test_config[:sign] = true
       end
 
       after() do
@@ -110,7 +110,7 @@ describe Artifact do
 
     context 'finds multiple files' do
       before(:all) do
-        @config[:file_name_pattern] = '.*'
+        @test_config[:file_name_pattern] = '.*'
       end
 
       after() do
@@ -134,10 +134,31 @@ describe Artifact do
       end
     end
 
+    context 'exclude specific files' do
+      before(:all) do
+        @test_config[:file_name_pattern] = '.*'
+        @test_config[:exclude] = ['RE.*']
+      end
+
+      after() do
+        @test_config[:exclude] = nil
+        Dir.chdir @pwd
+      end
+
+      it 'should find all files in spec/data/target except README' do
+        expect(Aws::S3::Resource).to receive(:new).and_return(stub_resource)
+        @push = TestPush.new @config
+        @push.find_artifact
+
+        expect(@push.artifacts.length).to be(2)
+        expect(@push.artifacts).to eq(['./', './test.txt'])
+      end
+    end
+
     context 'artifact already exists' do
       before(:all) do
-        @config[:file_name_pattern] = '.*\.txt'
-        @config[:sign] = true
+        @test_config[:file_name_pattern] = '.*\.txt'
+        @test_config[:sign] = true
       end
 
       after() do
@@ -177,12 +198,12 @@ describe Artifact do
 
       context 'production' do
         before do
-          @config[:environment_name] = 'production'
-          @config[:silent] = false
+          @test_config[:environment_name] = 'production'
+          @test_config[:silent] = false
         end
         after do
-          @config[:environment_name] = 'staging'
-          @config[:silent] = true
+          @test_config[:environment_name] = 'staging'
+          @test_config[:silent] = true
         end
 
         it 'should not push artifact to s3, if artifact already exists' do
@@ -219,8 +240,8 @@ describe Artifact do
 
     context 'finds multiple files with subdirectories' do
       before(:all) do
-        @config[:file_name_pattern] = '.*'
-        @config[:target_directory] = 'target_with_subdirectories'
+        @test_config[:file_name_pattern] = '.*'
+        @test_config[:target_directory] = 'target_with_subdirectories'
       end
 
       after() do
@@ -281,11 +302,11 @@ describe Artifact do
 
     context 'with verification' do
       before(:all) do
-        @config[:verify] = true
+        @test_config[:verify] = true
       end
 
       after(:all) do
-        @config[:verify] = false
+        @test_config[:verify] = false
       end
 
       it 'should get artifact' do
@@ -315,8 +336,8 @@ describe Artifact do
         @get.decrypt_artifact
         @get.unarchive_artifact
 
-        expect(File.exist? @config[:destination_directory] + '/test/releases/0.1.0/test.txt').to be(true)
-        expect(File.read @config[:destination_directory] + '/test/releases/0.1.0/test.txt').to eq(File.read('spec/data/target/test.txt'))
+        expect(File.exist? @test_config[:destination_directory] + '/test/releases/0.1.0/test.txt').to be(true)
+        expect(File.read @test_config[:destination_directory] + '/test/releases/0.1.0/test.txt').to eq(File.read('spec/data/target/test.txt'))
       end
     end
   end

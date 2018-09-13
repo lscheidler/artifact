@@ -38,6 +38,7 @@ module Artifact
       plugin_argument :force, description: 'force action', optional: true, default: false
       plugin_argument :silent, description: 'do not output progress', optional: true, default: false
       plugin_argument :output_prefix, description: 'output prefix', optional: true, default: '|'
+      plugin_argument :verbose, description: 'verbose output', optional: true, default: false
 
       # @raise [Aws::Sigv4::Errors::MissingCredentialsError]
       def after_initialize
@@ -58,6 +59,14 @@ module Artifact
           region: @bucket_region
         )
         @bucket = s3.bucket(@bucket_name)
+      end
+
+      def d msg
+        puts msg.subsection(prefix: '[d]') if @debug
+      end
+
+      def v msg
+        puts msg.subsection(prefix: '[v]') if @verbose
       end
     end
   end
