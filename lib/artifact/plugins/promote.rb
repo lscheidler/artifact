@@ -23,18 +23,21 @@ module Artifact
       # @!macro [attach] plugin_argument
       #   @!attribute $1
       #     $2
+      plugin_argument :source_version, optional: true, description: 'source version to promote'
       plugin_argument :target_environment_name, description: 'target environment name for promotion'
 
       # promote artifact
       def after_initialize
         super
 
+        @source_version ||= @version
+
         promote_artifact
       end
 
       # promote an artifact to a different environment
       def promote_artifact
-        source_key = "#{ @environment_name }/#{ @artifact }/#{ @version }.gpg"
+        source_key = "#{ @environment_name }/#{ @artifact }/#{ @source_version }.gpg"
         target_key = "#{ @target_environment_name }/#{ @artifact }/#{ @version }.gpg"
 
         subsection "Promote artifact from s3://#{ @bucket.name }/#{ source_key } to s3://#{ @bucket.name }/#{ target_key }", color: :green, prefix: @output_prefix unless @silent

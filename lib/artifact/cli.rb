@@ -109,7 +109,7 @@ module Artifact
           @config[:artifact] = artifact
         end
 
-        opts.on('-e', '--environment NAME', 'environment where to upload artifact') do |environment_name|
+        opts.on('-e', '--environment NAME', 'environment where to upload artifact', 'default: ' + @config[:environment_name]) do |environment_name|
           @config[:environment_name] = environment_name
         end
 
@@ -129,6 +129,10 @@ module Artifact
 
         ## PROMOTE
         opts.separator "\npromote options:"
+        opts.on('--source-version STRING', 'set source version') do |version|
+          @config[:source_version] = version
+        end
+
         opts.on('--target-environment NAME', 'set target environment name', 'default: ' + @config[:target_environment_name]) do |name|
           @config[:target_environment_name] = name
         end
@@ -168,6 +172,9 @@ examples:
 
     # promote artifact from staging/tools/mailconsumer@1.0.1 to production/tools/mailconsumer@1.0.1
     #{@script_name} -P -e staging -a tools/mailconsumer -v 1.0.1
+
+    # promote artifact from staging/tools/mailconsumer@1.0.1-staging to production/tools/mailconsumer@1.0.1
+    #{@script_name} -P -e staging -a tools/mailconsumer --source-version 1.0.1-staging -v 1.0.1
 
     # push artifact to staging/tools/mailconsumer@1.0.1
     #{@script_name} -p -e staging -a tools/mailconsumer -v 1.0.1 -t releases -w ~/tmp/data/tools/mailconsumer -F '.*mailconsumer.*.jar'

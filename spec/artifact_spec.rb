@@ -349,6 +349,7 @@ describe Artifact do
 
         def after_initialize
           initialize_bucket
+          @source_version ||= @version
         end
       end
     end
@@ -377,6 +378,25 @@ describe Artifact do
       @promote.promote_artifact
 
       expect(keys).to eq(['my-bucket/staging/test/0.1.0.gpg', 'production/test/0.1.0.gpg', 'my-bucket/staging/test/0.1.0.gpg.sign', 'production/test/0.1.0.gpg.sign'])
+    end
+
+    it 'should promote artifact from different source version' do
+      @config.source_version = "0.1.0-SNAPSHOT"
+
+      expect(Aws::S3::Resource).to receive(:new).and_return(stub_resource)
+      keys = []
+      stub_resource.client.stub_responses(:copy_object, -> (context) {
+        keys << context.params[:copy_source]
+        keys << context.params[:key]
+        context
+      })
+      @promote = TestPromote.new @config
+
+      @promote.promote_artifact
+
+      expect(keys).to eq(['my-bucket/staging/test/0.1.0-SNAPSHOT.gpg', 'production/test/0.1.0.gpg', 'my-bucket/staging/test/0.1.0-SNAPSHOT.gpg.sign', 'production/test/0.1.0.gpg.sign'])
+
+      @config.source_version = nil
     end
   end
 end
