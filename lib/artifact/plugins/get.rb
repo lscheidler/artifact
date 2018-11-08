@@ -94,19 +94,20 @@ module Artifact
           File.open(signfile.path, 'w') do |io|
             io.print @sign_data
           end
-          p @data.class
-          FileUtils.cp tempfile.path, '/var/tmp/tempfiles/test.gpg'
-          FileUtils.cp signfile.path, '/var/tmp/tempfiles/test.gpg.sig'
+
           %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --verify #{signfile.path} #{ tempfile.path }}
           raise 'Verification failed' if not $?.success?
         end
 
         subsection 'Decrypt artifact', color: :green, prefix: @output_prefix unless @silent
 
-        %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --decrypt-files #{ tempfile.path }}
+        zip_tempfile = Tempfile.new(["#{ @artifact.gsub('/', '_') }-#{ @version }_", '.zip'])
+        File.delete zip_tempfile.path
+
+        %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --output #{zip_tempfile.path} --decrypt #{ tempfile.path }}
         raise 'Decryption failed' if not $?.success?
 
-        @data = File.open(tempfile.path.gsub(/\.gpg$/, ''))
+        @data = File.open(zip_tempfile.path)
       end
 
       # decrypt artifact with ruby gpgme version > 1.0.8
