@@ -15,6 +15,7 @@
 require 'fileutils'
 require 'gpgme'
 require 'gpgme/version'
+require 'stringio'
 require 'tempfile'
 require 'zip'
 
@@ -87,6 +88,7 @@ module Artifact
         File.open(tempfile.path, 'w') do |io|
           io.print @data
         end
+        v 'gpg file stat: ' + File.stat(tempfile.path).inspect
 
         if @verify
           subsection 'Verify artifact', color: :green, prefix: @output_prefix unless @silent
@@ -106,6 +108,8 @@ module Artifact
 
         %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --output #{zip_tempfile.path} --decrypt #{ tempfile.path }}
         raise 'Decryption failed' if not $?.success?
+        v 'zip file stat: ' + File.stat(zip_tempfile.path).inspect
+        ObjectSpace.undefine_finalizer(zip_tempfile) if @debug
 
         @data = File.open(zip_tempfile.path)
       end
@@ -122,7 +126,7 @@ module Artifact
         end
 
         subsection 'Decrypt artifact', color: :green, prefix: @output_prefix unless @silent
-        @data = crypto.decrypt(@data)
+        @data = StringIO.new(crypto.decrypt(@data).read)
       rescue
         save_artifact '.gpg'
         raise
@@ -132,7 +136,9 @@ module Artifact
       def unarchive_artifact
         subsection 'Unarchive artifact', color: :green, prefix: @output_prefix unless @silent
         FileUtils.mkdir_p @release_directory
-        Zip::File.open_buffer(@data.read) do |zip_file|
+        Zip::File.open_buffer(@data) do |zip_file|
+          v 'zip entries: ' + zip_file.size.inspect
+
           # Handle entries one by one
           zip_file.each do |entry|
             # Extract to file/directory/symlink
