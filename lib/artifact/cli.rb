@@ -52,10 +52,11 @@ module Artifact
         bucket_name: 'my-bucket',
         bucket_region: 'eu-central-1',
         destination_directory: '/data/app/data',
-        gpg_id: '01234567890ABCDEF00000000000000000000000',
-        signer: '01234567890ABCDEF00000000000000000000000',
-        output_prefix: "[#{@script_name}]",
         environment_name: 'staging',
+        file_cache: false,
+        gpg_id: '01234567890ABCDEF00000000000000000000000',
+        output_prefix: "[#{@script_name}]",
+        signer: '01234567890ABCDEF00000000000000000000000',
         target_environment_name: 'production'
       }
       @pm = PluginManager.instance
@@ -119,6 +120,14 @@ module Artifact
 
         ## GET
         opts.separator "\nget options:"
+        opts.on('--compat-mode', 'use gpg binary directly to decrypt artifact') do
+          @config[:compat_mode] = true
+        end
+
+        opts.on('--file-cache', 'use file cache to reduce memory usage', 'fork must be supported by OS') do
+          @config[:file_cache] = true
+        end
+
         opts.on('-d', '--destination DIRECTORY', 'set destination directory', "default: #{@config[:destination_directory]}") do |directory|
           @config[:destination_directory] = directory
         end

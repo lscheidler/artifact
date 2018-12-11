@@ -32,6 +32,7 @@ def initialize_test_data
   @test_config = {
     bucket_name: @bucket_name,
     bucket_region: @bucket_region,
+    file_cache: false,
     gpg_id: '6986687D4705039AB6D27D6D39BC682A5434DA00',
     gpg_passphrase: 'notavalidpassphase',
     signer: '6986687D4705039AB6D27D6D39BC682A5434DA00',

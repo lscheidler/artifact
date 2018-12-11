@@ -269,10 +269,11 @@ describe Artifact do
   describe Artifact::Plugins::Get do
     before(:all) do
       class TestGet < @pm['Artifact::Plugins::Get']
-        attr_accessor :data, :sign_data
+        attr_accessor :artifact_gpg, :artifact_sign, :artifact_zip
 
         def after_initialize
           initialize_bucket
+          @file_cache = false
           @release_directory = "#{ @destination_directory }/#{ @artifact }/releases/#{ @version }"
         end
       end
@@ -295,8 +296,8 @@ describe Artifact do
         @get = TestGet.new @config
 
         @get.get_artifact
-        expect(@get.data).not_to be(nil)
-        expect(@get.sign_data).to be(nil)
+        expect(@get.artifact_gpg).not_to be(nil)
+        expect(@get.artifact_sign).to be(nil)
       end
     end
 
@@ -314,8 +315,12 @@ describe Artifact do
         @get = TestGet.new @config
 
         @get.get_artifact
-        expect(@get.data).not_to be(nil)
-        expect(@get.sign_data).not_to be(nil)
+        expect(@get.artifact_gpg).not_to be(nil)
+        expect(@get.artifact_gpg.io.size).not_to eq(0)
+        expect(@get.artifact_gpg.io.pos).to eq(0)
+        expect(@get.artifact_sign).not_to be(nil)
+        expect(@get.artifact_sign.io.size).not_to eq(0)
+        expect(@get.artifact_sign.io.pos).to eq(0)
       end
 
       it 'should decrypt artifact' do
@@ -324,8 +329,7 @@ describe Artifact do
 
         @get.get_artifact
         @get.decrypt_artifact
-        expect(@get.data).not_to be(nil)
-        expect(@get.sign_data).not_to be(nil)
+        expect(@get.artifact_zip).not_to be(nil)
       end
 
       it 'should unarchive artifact' do

@@ -34,6 +34,8 @@ module Artifact
       plugin_argument :gpg_id, description: 'gpg id for decryption'
       plugin_argument :gpg_passphrase, description: 'gpg passphrase', validator: Proc.new {|x| not x.nil? and not x.empty?}
 
+      plugin_argument :compat_mode, description: 'decrypt artifact with gpg binary', optional: true, default: false
+      plugin_argument :file_cache, description: 'use file cache', optional: true, default: false
       plugin_argument :group, description: 'unix group for deployed artifact', optional: true, default: 'app'
       plugin_argument :owner, description: 'unix ownder for deployed artifact', optional: true, default: 'app'
       plugin_argument :verify, description: 'verify downloaded artifact', optional: true, default: false
@@ -58,21 +60,25 @@ module Artifact
       # get artifact from s3
       def get_artifact
         key = "#{ @environment_name }/#{ @artifact }/#{ @version }.gpg"
-        subsection "Get artifact from s3://#{ @bucket.name }/#{ key }", color: :green, prefix: @output_prefix unless @silent
-        object = @bucket.object(key)
-        @data = object.get.body.read
+        @artifact_gpg = run(file_cache: (@file_cache or is_compat_mode?), extension: '.gpg') do
+          subsection "Get artifact from s3://#{ @bucket.name }/#{ key }", color: :green, prefix: @output_prefix unless @silent
+          object = @bucket.object(key)
+          object.get.body
+        end
 
         if @verify
-          signature_key = "#{ key }.sig"
-          subsection "Get signature from s3://#{ @bucket.name }/#{ signature_key }", color: :green, prefix: @output_prefix unless @silent
-          object = @bucket.object(signature_key)
-          @sign_data = object.get.body.read
+          @artifact_sign = run(file_cache: (@file_cache or is_compat_mode?), extension: '.sign') do
+            signature_key = "#{ key }.sig"
+            subsection "Get signature from s3://#{ @bucket.name }/#{ signature_key }", color: :green, prefix: @output_prefix unless @silent
+            object = @bucket.object(signature_key)
+            object.get.body
+          end
         end
       end
 
       # decrypt artifact with gpg
       def decrypt_artifact
-        if GPGME::VERSION == '1.0.8'
+        if is_compat_mode?
           decrypt_artifact_compat
         else
           decrypt_artifact_new
@@ -84,34 +90,23 @@ module Artifact
       def decrypt_artifact_compat
         require 'tempfile'
 
-        tempfile = Tempfile.new(["#{ @artifact.gsub('/', '_') }-#{ @version }_", '.gpg'])
-        File.open(tempfile.path, 'w') do |io|
-          io.print @data
-        end
-        v 'gpg file stat: ' + File.stat(tempfile.path).inspect
+        v 'gpg file stat: ' + File.stat(@artifact_gpg.path).inspect
 
         if @verify
           subsection 'Verify artifact', color: :green, prefix: @output_prefix unless @silent
-          signfile = Tempfile.new(["#{ @artifact.gsub('/', '_') }-#{ @version }_", '.gpg.sig'])
-          File.open(signfile.path, 'w') do |io|
-            io.print @sign_data
-          end
 
-          %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --verify #{signfile.path} #{ tempfile.path }}
+          %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --verify #{@artifact_sign.path} #{ @artifact_gpg.path }}
           raise 'Verification failed' if not $?.success?
         end
 
         subsection 'Decrypt artifact', color: :green, prefix: @output_prefix unless @silent
 
-        zip_tempfile = Tempfile.new(["#{ @artifact.gsub('/', '_') }-#{ @version }_", '.zip'])
-        File.delete zip_tempfile.path
-
-        %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --output #{zip_tempfile.path} --decrypt #{ tempfile.path }}
-        raise 'Decryption failed' if not $?.success?
-        v 'zip file stat: ' + File.stat(zip_tempfile.path).inspect
-        ObjectSpace.undefine_finalizer(zip_tempfile) if @debug
-
-        @data = File.open(zip_tempfile.path)
+        @artifact_zip = run(file_cache: true, extension: '.zip') do |file|
+          %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --output #{file.path} --decrypt #{ @artifact_gpg.path }}
+          raise 'Decryption failed' if not $?.success?
+          v 'zip file stat: ' + File.stat(file.path).inspect
+          ObjectSpace.undefine_finalizer(file) if @debug
+        end
       end
 
       # decrypt artifact with ruby gpgme version > 1.0.8
@@ -120,13 +115,16 @@ module Artifact
 
         if @verify
           subsection 'Verify artifact', color: :green, prefix: @output_prefix unless @silent
-          crypto.verify(@sign_data, :signed_text => @data) do |signature|
+          crypto.verify(@artifact_sign.io, :signed_text => @artifact_gpg.io) do |signature|
             raise GPGME::Error::BadSignature.new GPGME::GPG_ERR_BAD_SIGNATURE unless signature.valid?
           end
+          @artifact_gpg.io.rewind
         end
 
         subsection 'Decrypt artifact', color: :green, prefix: @output_prefix unless @silent
-        @data = StringIO.new(crypto.decrypt(@data).read)
+        @artifact_zip = run(extension: '.zip') do
+          StringIO.new(crypto.decrypt(@artifact_gpg.io).read)
+        end
       rescue
         save_artifact '.gpg'
         raise
@@ -136,17 +134,20 @@ module Artifact
       def unarchive_artifact
         subsection 'Unarchive artifact', color: :green, prefix: @output_prefix unless @silent
         FileUtils.mkdir_p @release_directory
-        Zip::File.open_buffer(@data) do |zip_file|
-          v 'zip entries: ' + zip_file.size.inspect
+        run() do
+          Zip::File.open_buffer(@artifact_zip.io) do |zip_file|
+            v 'zip entries: ' + zip_file.size.inspect
 
-          # Handle entries one by one
-          zip_file.each do |entry|
-            # Extract to file/directory/symlink
-            v '+ ' + "#{@release_directory}/#{entry.name}"
-            entry.extract("#{@release_directory}/#{entry.name}") do
-              @force
+            # Handle entries one by one
+            zip_file.each do |entry|
+              # Extract to file/directory/symlink
+              v '+ ' + "#{@release_directory}/#{entry.name}"
+              entry.extract("#{@release_directory}/#{entry.name}") do
+                @force
+              end
             end
           end
+          nil
         end
       rescue
         save_artifact '.zip'
@@ -164,6 +165,10 @@ module Artifact
         FileUtils.chown_R @owner, @group, @release_directory
       end
 
+      def run extension: '.data',file_cache: @file_cache,  &block
+        Runner.new extension: extension, file_cache: file_cache, prefix: "#{ @artifact.gsub('/', '_') }-#{ @version }_", block: block
+      end
+
       # save *@data* to a temporary path with *extension*, if *@debug* is true
       def save_artifact extension
         if @debug
@@ -174,6 +179,41 @@ module Artifact
           subsection "Saving data to #{path}", color: :yellow, prefix: @output_prefix
           File.open(path, 'w') do |io|
             io.print @data
+          end
+        end
+      end
+
+      def is_compat_mode?
+        GPGME::VERSION == '1.0.8' or @compat_mode
+      end
+
+      class Runner
+        attr_accessor :path, :io
+
+        def initialize block:, file_cache:, prefix:, extension: '.data'
+          if file_cache
+            @io = Tempfile.new([prefix, extension])
+            pid = fork do
+              begin
+                ObjectSpace.undefine_finalizer(@io)
+
+                data = block.yield @io
+                while not data.nil? and line=data.gets
+                  @io.print line
+                end
+                @io.rewind
+              rescue => e
+                puts e.class.to_s + ' ' + e.message
+                raise
+              end
+            end
+            Process.wait(pid)
+
+            raise 'failed' if not $?.success?
+
+            @path = @io.path
+          else
+            @io = block.yield @io
           end
         end
       end

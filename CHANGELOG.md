@@ -1,3 +1,9 @@
+0.1.7 (2018-12-11)
+==================
+
+- introduce file\_cache configuration, which uses a file cache for artifact files.
+  with this option enabled artifact uses fork to reduce memory usage for --get.
+
 0.1.6 (2018-11-21)
 ==================
 
