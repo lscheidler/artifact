@@ -74,6 +74,14 @@ module Artifact
               if File.directory? artifact
                 artifact += '/' unless artifact.end_with? '/'
                 Zip::Entry.new(nil, artifact).write_to_zip_output_stream(out)
+              elsif File.symlink? artifact
+                next unless File.realpath(File.readlink(artifact)).start_with? File.realpath(File.join(@workspace, @target_directory))
+
+                d 's ' + artifact
+
+                entry = Zip::Entry.new(nil, artifact)
+                entry.gather_fileinfo_from_srcpath(artifact)
+                entry.write_to_zip_output_stream(out)
               else
                 d 'w ' + artifact
                 out.write File.read(artifact)

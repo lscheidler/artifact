@@ -1,3 +1,9 @@
+0.1.8 (2019-01-22)
+==================
+
+- support symlinks, when they point to files in target directory
+- fix problem with empty files in compat mode
+
 0.1.7 (2018-12-11)
 ==================
 

@@ -102,11 +102,14 @@ module Artifact
         subsection 'Decrypt artifact', color: :green, prefix: @output_prefix unless @silent
 
         @artifact_zip = run(file_cache: true, extension: '.zip') do |file|
-          %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --output #{file.path} --decrypt #{ @artifact_gpg.path }}
+          #%x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --output #{file.path} --decrypt #{ @artifact_gpg.path }}
+          %x{echo "#{ @gpg_passphrase }" | gpg --batch --passphrase-fd 0 --decrypt-files #{ @artifact_gpg.path }}
+          FileUtils.mv @artifact_gpg.path.gsub(/\.gpg/, ''), file.path
           raise 'Decryption failed' if not $?.success?
-          v 'zip file stat: ' + File.stat(file.path).inspect
           ObjectSpace.undefine_finalizer(file) if @debug
+          File.open(file.path)
         end
+        v 'zip file stat: ' + File.stat(@artifact_zip.path).inspect
       end
 
       # decrypt artifact with ruby gpgme version > 1.0.8
