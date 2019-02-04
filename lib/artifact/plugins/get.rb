@@ -23,6 +23,53 @@ require 'plugin'
 
 require_relative 'common'
 
+# monkey patch to support symlinks again
+module Zip
+  class Entry
+    @@base_dir = nil
+
+    def self.base_dir= directory
+      @@base_dir = directory
+    end
+
+    def create_symlink(dest_path)
+      stat = nil
+      begin
+        stat = ::File.lstat(dest_path)
+      rescue Errno::ENOENT
+      end
+
+      io     = get_input_stream
+      linkto = io.read
+
+      if stat
+        if stat.symlink?
+          if ::File.readlink(dest_path) == linkto
+            return
+          else
+            raise ::Zip::DestinationFileExistsError,
+                  "Cannot create symlink '#{dest_path}'. " \
+                      'A symlink already exists with that name'
+          end
+        else
+          raise ::Zip::DestinationFileExistsError,
+                "Cannot create symlink '#{dest_path}'. " \
+                    'A file already exists with that name'
+        end
+      end
+
+      # sanity check
+      # if symlink points outsite of zip, abort
+      if linkto.start_with? '/' or (linkto.start_with? '../' and (not @@base_dir or not ::File.expand_path(::File.join(::File.dirname(dest_path), linkto)).start_with? @@base_dir))
+        puts "WARNING: skipped symlink #{dest_path}"
+        return
+      end
+
+      ::File.symlink(linkto, dest_path)
+    end
+  end
+end
+
 module Artifact
   module Plugins
     # deploy artifact
@@ -138,6 +185,9 @@ module Artifact
         subsection 'Unarchive artifact', color: :green, prefix: @output_prefix unless @silent
         FileUtils.mkdir_p @release_directory
         run() do
+          # monkey patch for base directory to prevent creation of symlinks pointing outsite of @release_directory
+          Zip::Entry.base_dir = @release_directory
+
           Zip::File.open_buffer(@artifact_zip.io) do |zip_file|
             v 'zip entries: ' + zip_file.size.inspect
 

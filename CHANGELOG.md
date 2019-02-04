@@ -1,3 +1,9 @@
+0.1.9 (2019-02-04)
+==================
+
+- support symlinks in zipfiles
+  - reactivated rubyzip symlink feature with some safeguards
+
 0.1.8 (2019-01-22)
 ==================
 

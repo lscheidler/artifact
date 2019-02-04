@@ -75,7 +75,10 @@ module Artifact
                 artifact += '/' unless artifact.end_with? '/'
                 Zip::Entry.new(nil, artifact).write_to_zip_output_stream(out)
               elsif File.symlink? artifact
-                next unless File.realpath(File.readlink(artifact)).start_with? File.realpath(File.join(@workspace, @target_directory))
+                unless (f=File.realpath(artifact)).start_with? File.realpath('./') and File.exist?(f)
+                  v 'warning: doesn\'t add ' + artifact + ', because it points outside of target directory.'
+                  next
+                end
 
                 d 's ' + artifact
 

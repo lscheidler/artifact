@@ -122,8 +122,8 @@ describe Artifact do
         @push = TestPush.new @config
         @push.find_artifact
 
-        expect(@push.artifacts.length).to be(3)
-        expect(@push.artifacts).to eq(['./', './README', './test.txt'])
+        expect(@push.artifacts.length).to be(4)
+        expect(@push.artifacts).to eq(['./', './README', './symlink', './test.txt'])
       end
 
       it 'should run without an error' do
@@ -150,8 +150,8 @@ describe Artifact do
         @push = TestPush.new @config
         @push.find_artifact
 
-        expect(@push.artifacts.length).to be(2)
-        expect(@push.artifacts).to eq(['./', './test.txt'])
+        expect(@push.artifacts.length).to be(3)
+        expect(@push.artifacts).to eq(['./', './symlink', './test.txt'])
       end
     end
 
@@ -282,10 +282,10 @@ describe Artifact do
     before do
       stub_resource.client.stub_responses(:get_object, [
                                             Aws::S3::Types::GetObjectOutput.new(
-                                              body: File.open('spec/data/0.1.0.gpg')
+                                                              body: File.open(File.join(@pwd, 'spec/data/0.1.0.gpg'))
                                             ),
                                             Aws::S3::Types::GetObjectOutput.new(
-                                              body: File.open('spec/data/0.1.0.gpg.sign')
+                                                              body: File.open(File.join(@pwd, 'spec/data/0.1.0.gpg.sign'))
                                             )
                                           ])
     end
@@ -344,10 +344,47 @@ describe Artifact do
         expect(File.read @test_config[:destination_directory] + '/test/releases/0.1.0/test.txt').to eq(File.read('spec/data/target/test.txt'))
       end
     end
+
+    context 'test symlink compressing and extraction' do
+      before(:all) do
+        import_gpg_key
+        import_gpg_key type: :private
+
+        @test_config[:target_directory] = 'target'
+        @test_config[:version]= '0.1.1'
+
+        class TestPush < @pm['Artifact::Plugins::Push']
+          attr_accessor :artifacts, :data, :sign_data
+
+          def after_initialize
+            initialize_bucket
+          end
+        end
+
+        @push = TestPush.new @config
+        @push.find_artifact
+        @push.archive_artifact
+
+        @data = @push.data
+
+        @get = TestGet.new @config
+        @get.artifact_zip = TestGet::Runner.new block: Proc.new{@data}, prefix: nil, file_cache: false
+      end
+
+      it 'should extract symlink' do
+        @get.unarchive_artifact
+
+        expect(File.exist? @test_config[:destination_directory] + '/test/releases/0.1.1/test.txt').to be(true)
+        expect(File.read @test_config[:destination_directory] + '/test/releases/0.1.1/test.txt').to eq(File.read(File.join(@pwd, 'spec/data/target/test.txt')))
+        expect(File.realpath @test_config[:destination_directory] + '/test/releases/0.1.1/symlink').to eq(File.join(@test_config[:destination_directory], 'test/releases/0.1.1/test.txt'))
+      end
+    end
   end
 
   describe Artifact::Plugins::Promote do
     before(:all) do
+      @test_config[:version]= '0.1.0'
+
       class TestPromote < @pm['Artifact::Plugins::Promote']
         attr_accessor :artifacts, :data, :sign_data
 
